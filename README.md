@@ -3,7 +3,9 @@
 A real-time multiplayer Tic-Tac-Toe game playable directly in your terminal over SSH. No client installation required—just an SSH client.
 
 ## Demo
-[Watch the demo video here](YOUR_VIDEO_URL_HERE)
+https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
+
+
 
 ## Features
 - **Instant Multiplayer**: Create a room and share the 4-digit code.
