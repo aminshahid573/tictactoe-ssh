@@ -30,6 +30,9 @@ func main() {
 		log.Fatal("Failed to init Firebase", "err", err)
 	}
 
+	// Cleanup old rooms on startup
+	go db.CleanZombies()
+
 	// 2. Setup SSH
 	s, err := wish.NewServer(
 		wish.WithAddress(fmt.Sprintf("%s:%d", config.Host, config.Port)),

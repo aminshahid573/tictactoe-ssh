@@ -315,3 +315,23 @@ func GetPublicRooms() ([]Room, error) {
 
 	return list, nil
 }
+
+// CleanZombies removes rooms that haven't been updated in 1 hour
+func CleanZombies() {
+	ref := client.NewRef("rooms")
+	var rawMap map[string]rawRoom
+	if err := ref.Get(context.Background(), &rawMap); err != nil {
+		log.Printf("Janitor: Error fetching rooms: %v", err)
+		return
+	}
+
+	now := time.Now().Unix()
+	limit := int64(3600) // 1 hour
+
+	for code, r := range rawMap {
+		if now-r.UpdatedAt > limit {
+			log.Printf("Janitor: Deleting zombie room %s (Last active: %ds ago)", code, now-r.UpdatedAt)
+			ref.Child(code).Delete(context.Background())
+		}
+	}
+}
