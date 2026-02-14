@@ -88,6 +88,9 @@ func (m Model) View() string {
 			lipgloss.JoinVertical(lipgloss.Left, pubRendered, privRendered),
 			"\n",
 		)
+		if m.Err != nil {
+			content = lipgloss.JoinVertical(lipgloss.Center, content, styles.Err.Render(m.Err.Error()))
+		}
 		helpText = "↑/↓: Change • Enter: Create • Esc: Back"
 
 	case StateInputCode:

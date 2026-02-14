@@ -9,6 +9,8 @@ import (
 	"tictactoe-ssh/internal/config"
 	"tictactoe-ssh/internal/game"
 
+	"time"
+
 	"firebase.google.com/go/v4"
 	db "firebase.google.com/go/v4/db"
 	"google.golang.org/api/option"
@@ -30,6 +32,7 @@ type Room struct {
 	WinsX       int               `json:"winsX"`
 	WinsO       int               `json:"winsO"`
 	Spectators  map[string]string `json:"spectators"`
+	UpdatedAt   int64             `json:"updatedAt"`
 }
 
 // rawRoom is a helper struct to safely read dirty data (mixed types) from Firebase
@@ -48,6 +51,7 @@ type rawRoom struct {
 	WinsX       int               `json:"winsX"`
 	WinsO       int               `json:"winsO"`
 	Spectators  map[string]string `json:"spectators"`
+	UpdatedAt   int64             `json:"updatedAt"`
 }
 
 var client *db.Client
@@ -122,6 +126,15 @@ func sanitizeRoom(code string, raw rawRoom) Room {
 
 func CreateRoom(code, pid, name string, public bool) error {
 	ref := client.NewRef("rooms/" + code)
+
+	// Check collision
+	var raw rawRoom
+	if err := ref.Get(context.Background(), &raw); err == nil {
+		if raw.PlayerX != "" {
+			return fmt.Errorf("room code taken")
+		}
+	}
+
 	r := Room{
 		Code:        code,
 		Board:       [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "},
@@ -131,6 +144,7 @@ func CreateRoom(code, pid, name string, public bool) error {
 		IsPublic:    public,
 		Status:      "waiting",
 		Spectators:  make(map[string]string),
+		UpdatedAt:   time.Now().Unix(),
 	}
 	log.Printf("Creating Room: %s", code)
 	return ref.Set(context.Background(), r)
