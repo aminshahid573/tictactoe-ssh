@@ -179,6 +179,14 @@ func JoinRoom(code, pid, name string) error {
 		if raw.PlayerX == "" {
 			return nil, fmt.Errorf("room not found")
 		}
+
+		// Check if Host is rejoining
+		if raw.PlayerX == pid {
+			raw.PlayerXName = name
+			raw.UpdatedAt = time.Now().Unix()
+			return raw, nil
+		}
+
 		if raw.PlayerO != "" && raw.PlayerO != pid {
 			// Room full -> Join as Spectator
 			if raw.Spectators == nil {
