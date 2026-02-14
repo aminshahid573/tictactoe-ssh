@@ -1,6 +1,6 @@
 # TicTacToe SSH
 
-A real-time multiplayer Tic-Tac-Toe game playable directly in your terminal over SSH. No client installation required—just an SSH client.
+A real-time multiplayer Tic-Tac-Toe game playable directly in your terminal over SSH. No client installation required, just an SSH client.
 
 ## Demo
 https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
@@ -74,4 +74,4 @@ ssh tictactoe.example.com
 - **Firebase**: Real-time state synchronization.
 
 ---
-*Created for the love of CLI tools.*
+*Created for the ❤️ of CLI tools.*
