@@ -47,6 +47,7 @@ type Model struct {
 	MenuIndex   int
 	PopupActive bool
 	PopupType   int
+	Busy        bool
 
 	SearchInput     textinput.Model
 	PublicRooms     []db.Room

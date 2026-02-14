@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -15,6 +16,13 @@ import (
 type roomUpdateMsg db.Room
 type roomsFetchedMsg []db.Room
 type errMsg error
+type pollErrorMsg error
+
+type roomCreatedMsg struct{ code string }
+type roomJoinedMsg struct {
+	code string
+	side string
+}
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -28,12 +36,55 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Room deleted?
 		if m.Game.PlayerX == "" {
-			m.Err = nil
+			m.Err = fmt.Errorf("Room closed by host")
 			m.State = StateMenu
 			m.RoomCode = ""
+			m.Busy = false
 			return m, nil
 		}
 		return m, pollCmd(m.RoomCode)
+	}
+
+	// 2. Handle Polling Errors
+	if err, ok := msg.(pollErrorMsg); ok {
+		m.Err = err
+		// Retry polling after delay
+		return m, pollCmd(m.RoomCode)
+	}
+
+	// 3. Handle Async DB Results
+	switch msg := msg.(type) {
+	case roomCreatedMsg:
+		m.Busy = false
+		m.RoomCode = msg.code
+		m.MySide = "X"
+
+		m.Cleanup.Mu.Lock()
+		m.Cleanup.RoomCode = msg.code
+		m.Cleanup.IsHost = true
+		m.Cleanup.Mu.Unlock()
+
+		m.State = StateLobby
+		return m, pollCmd(msg.code)
+
+	case roomJoinedMsg:
+		m.Busy = false
+		m.RoomCode = msg.code
+		m.MySide = msg.side
+
+		m.Cleanup.Mu.Lock()
+		m.Cleanup.RoomCode = msg.code
+		m.Cleanup.IsHost = (msg.side == "X")
+		m.Cleanup.Mu.Unlock()
+
+		m.State = StateGame
+		return m, pollCmd(msg.code)
+
+	case errMsg:
+		m.Busy = false
+		m.Err = msg
+		// Stay in current state, allow retry
+		return m, nil
 	}
 
 	switch msg := msg.(type) {
@@ -188,22 +239,12 @@ func updateCreateConfig(m Model, msg tea.Msg) (Model, tea.Cmd) {
 		case "up", "down", "k", "j":
 			m.IsPublicCreate = !m.IsPublicCreate
 		case "enter":
-			code := generateCode()
-			m.RoomCode = code
-			m.MySide = "X"
-			// Create room in DB
-			if err := db.CreateRoom(code, m.SessionID, m.MyName, m.IsPublicCreate); err != nil {
-				m.Err = err
+			if m.Busy {
 				return m, nil
 			}
-
-			m.Cleanup.Mu.Lock()
-			m.Cleanup.RoomCode = code
-			m.Cleanup.IsHost = true
-			m.Cleanup.Mu.Unlock()
-
-			m.State = StateLobby
-			return m, pollCmd(code)
+			m.Busy = true
+			code := generateCode()
+			return m, createRoomCmd(code, m.SessionID, m.MyName, m.IsPublicCreate)
 		case "esc":
 			m.State = StateMenu
 		}
@@ -217,34 +258,12 @@ func updateCodeInput(m Model, msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyEnter {
-			code := strings.ToUpper(m.TextInput.Value())
-			if err := db.JoinRoom(code, m.SessionID, m.MyName); err != nil {
-				m.Err = err // Display error in view
-			} else {
-				m.RoomCode = code
-
-				// Determine role immediately
-				r, _ := db.GetRoom(code)
-				if r != nil {
-					if r.PlayerO == m.SessionID {
-						m.MySide = "O"
-					} else if r.PlayerX == m.SessionID {
-						m.MySide = "X"
-					} else {
-						m.MySide = "Spectator"
-					}
-				} else {
-					m.MySide = "O"
-				}
-
-				m.Cleanup.Mu.Lock()
-				m.Cleanup.RoomCode = code
-				m.Cleanup.IsHost = (m.MySide == "X")
-				m.Cleanup.Mu.Unlock()
-
-				m.State = StateGame
-				return m, pollCmd(code)
+			if m.Busy {
+				return m, nil
 			}
+			m.Busy = true
+			code := strings.ToUpper(m.TextInput.Value())
+			return m, joinRoomCmd(code, m.SessionID, m.MyName)
 		}
 		if msg.Type == tea.KeyEsc {
 			m.State = StateMenu
@@ -302,34 +321,12 @@ func updatePublicList(m Model, msg tea.Msg) (Model, tea.Cmd) {
 		case "enter":
 			list := getSortedList()
 			if len(list) > 0 && m.ListSelectedRow < len(list) {
-				sel := list[m.ListSelectedRow]
-				if err := db.JoinRoom(sel.Code, m.SessionID, m.MyName); err != nil {
-					m.Err = err
-				} else {
-					m.RoomCode = sel.Code
-
-					// Determine role
-					r, _ := db.GetRoom(sel.Code)
-					if r != nil {
-						if r.PlayerO == m.SessionID {
-							m.MySide = "O"
-						} else if r.PlayerX == m.SessionID {
-							m.MySide = "X"
-						} else {
-							m.MySide = "Spectator"
-						}
-					} else {
-						m.MySide = "Spectator"
-					}
-
-					m.Cleanup.Mu.Lock()
-					m.Cleanup.RoomCode = sel.Code
-					m.Cleanup.IsHost = (m.MySide == "X")
-					m.Cleanup.Mu.Unlock()
-
-					m.State = StateGame
-					return m, pollCmd(sel.Code)
+				if m.Busy {
+					return m, nil
 				}
+				sel := list[m.ListSelectedRow]
+				m.Busy = true
+				return m, joinRoomCmd(sel.Code, m.SessionID, m.MyName)
 			}
 		}
 	}
@@ -394,9 +391,15 @@ func updateGame(m Model, msg tea.Msg) (Model, tea.Cmd) {
 }
 
 func pollCmd(code string) tea.Cmd {
-	return tea.Tick(time.Millisecond*200, func(t time.Time) tea.Msg {
+	return tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
 		r, err := db.GetRoom(code)
-		if err != nil || r == nil {
+		if err != nil {
+			if err.Error() == "room does not exist" {
+				return roomUpdateMsg{}
+			}
+			return pollErrorMsg(err)
+		}
+		if r == nil {
 			return roomUpdateMsg{}
 		}
 		return roomUpdateMsg(*r)
@@ -411,6 +414,36 @@ func fetchPublicRoomsCmd() tea.Cmd {
 			return errMsg(err)
 		}
 		return roomsFetchedMsg(rooms)
+	}
+}
+
+func createRoomCmd(code, pid, name string, public bool) tea.Cmd {
+	return func() tea.Msg {
+		if err := db.CreateRoom(code, pid, name, public); err != nil {
+			return errMsg(err)
+		}
+		return roomCreatedMsg{code: code}
+	}
+}
+
+func joinRoomCmd(code, pid, name string) tea.Cmd {
+	return func() tea.Msg {
+		if err := db.JoinRoom(code, pid, name); err != nil {
+			return errMsg(err)
+		}
+		// Determine role async
+		r, _ := db.GetRoom(code)
+		side := "O"
+		if r != nil {
+			if r.PlayerX == pid {
+				side = "X"
+			} else if r.PlayerO == pid {
+				side = "O"
+			} else {
+				side = "Spectator"
+			}
+		}
+		return roomJoinedMsg{code: code, side: side}
 	}
 }
 
