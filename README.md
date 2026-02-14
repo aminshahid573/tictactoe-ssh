@@ -16,6 +16,14 @@ https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
 
 ## How to Run
 
+### Play Now (Public Server)
+> **Note:** The public server is currently under deployment. Check back soon!
+
+Once deployed, you can play instantly:
+```bash
+ssh tictactoe.example.com
+```
+
 ### Development (Local)
 1. **Get Credentials**:
    - Go to Firebase Console > Project Settings > Service Accounts.
@@ -39,14 +47,6 @@ https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
    ```bash
    ssh -p 2324 localhost
    ```
-
-### Production (Deploy)
-1. Build the binary:
-   ```bash
-   go build -o server ./cmd/server
-   ```
-2. Set the environment variables (`FIREBASE_DB_URL` and `GOOGLE_APPLICATION_CREDENTIALS`) on your server.
-3. Run `./server`.
 
 ## Tech Stack
 - **Go**: Backend logic.
