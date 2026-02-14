@@ -57,6 +57,10 @@ type rawRoom struct {
 var client *db.Client
 
 func Init() error {
+	if config.DBURL == "" {
+		return fmt.Errorf("FIREBASE_DB_URL environment variable is required")
+	}
+
 	var opts []option.ClientOption
 	if config.CredPath != "" {
 		if _, err := os.Stat(config.CredPath); err == nil {

@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	DBURL        = "https://YOUR-FIREBASE-DB-URL.firebasedatabase.app"
-	CredPath     = "serviceAccount.json"
+	DBURL        = ""
+	CredPath     = ""
 	SyncInterval = 500 * time.Millisecond
 	Host         = "localhost"
 	Port         = 2324
