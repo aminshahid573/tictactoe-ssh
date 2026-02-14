@@ -17,7 +17,8 @@ A real-time multiplayer Tic-Tac-Toe game playable directly in your terminal over
 1. **Prerequisites**
    - Go 1.25+
    - A Firebase project with Realtime Database enabled.
-   - Set `FIREBASE_DB_URL` environment variable (or put `serviceAccount.json` in root).
+   - Set `FIREBASE_DB_URL` environment variable.
+   - Set `GOOGLE_APPLICATION_CREDENTIALS` environment variable pointing to your `serviceAccount.json`.
 
 2. **Start the Server**
    ```bash
