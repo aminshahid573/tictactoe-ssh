@@ -133,9 +133,11 @@ func (m Model) View() string {
 
 	case StateGame:
 		content = renderGame(m)
-		// Game help is rendered inside renderGame to be closer to board,
-		// but we can add global help too if needed.
-		helpText = "Arrows: Move • Space: Place • R: Restart • Q: Quit"
+		if m.Game.GameType == "chess" {
+			helpText = "arrows/hjkl move • enter/space select • esc deselect • f font • q quit"
+		} else {
+			helpText = "Arrows: Move • Space: Place • R: Restart • Q: Quit"
+		}
 	}
 
 	// Combine Content + Help Footer
@@ -514,11 +516,6 @@ func renderChessGame(m Model) string {
 		Bold(m.ChessIsBlocked).
 		Render(statusText)
 
-	// Help text
-	help := lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#888888")).
-		Render("arrows/hjkl move • enter/space select • esc deselect • f font • q quit")
-
 	content := lipgloss.JoinVertical(lipgloss.Center,
 		styles.Title.Render("CHESS"),
 		header,
@@ -528,7 +525,6 @@ func renderChessGame(m Model) string {
 		fileLabelRow,
 		"",
 		status,
-		help,
 	)
 
 	blockBorder := lipgloss.Border{
@@ -548,20 +544,7 @@ func renderChessGame(m Model) string {
 		Padding(1, 2).
 		Render(content)
 
-	fullScreen := lipgloss.NewStyle().
-		Width(m.Width).
-		Height(m.Height).
-		Background(styles.ChessBg).
-		Align(lipgloss.Center, lipgloss.Center)
-
-	result := fullScreen.Render(bordered)
-
-	lines := strings.Split(result, "\n")
-	if len(lines) > m.Height {
-		lines = lines[:m.Height]
-	}
-
-	return strings.Join(lines, "\n")
+	return bordered
 }
 
 func computeChessSquareSize(termWidth, termHeight int) (sqW, sqH int) {
@@ -578,6 +561,9 @@ func computeChessSquareSize(termWidth, termHeight int) (sqW, sqH int) {
 	cellUnit := maxFromW
 	if maxFromH < cellUnit {
 		cellUnit = maxFromH
+	}
+	if cellUnit > 3 {
+		cellUnit = 3
 	}
 	if cellUnit < 1 {
 		cellUnit = 1
