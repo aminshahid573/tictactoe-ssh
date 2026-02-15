@@ -359,8 +359,15 @@ func renderChessGame(m Model) string {
 
 	sqW, sqH := computeChessSquareSize(m.Width, m.Height)
 
+	isFlipped := (m.MySide == "O")
+
 	files := []string{"a", "b", "c", "d", "e", "f", "g", "h"}
 	ranks := []string{"8", "7", "6", "5", "4", "3", "2", "1"}
+
+	if isFlipped {
+		files = []string{"h", "g", "f", "e", "d", "c", "b", "a"}
+		ranks = []string{"1", "2", "3", "4", "5", "6", "7", "8"}
+	}
 
 	var boardRows []string
 
@@ -384,17 +391,23 @@ func renderChessGame(m Model) string {
 				bg = styles.ChessLightSquare
 			}
 
-			piece := m.Game.ChessBoard[r][c]
+			br, bc := r, c
+			if isFlipped {
+				br = 7 - r
+				bc = 7 - c
+			}
+
+			piece := m.Game.ChessBoard[br][bc]
 			fg := styles.ChessBlackPiece
 			if piece.IsWhite {
 				fg = styles.ChessWhitePiece
 			}
 
 			// Determine square highlighting
-			isCursor := (r == m.CursorR && c == m.CursorC)
-			isSelected := (m.ChessSelected && r == m.ChessSelRow && c == m.ChessSelCol)
-			isValidMove := m.ChessValidMoves[game.Pos{Row: r, Col: c}]
-			isCapture := isValidMove && !m.Game.ChessBoard[r][c].IsEmpty()
+			isCursor := (m.CursorR == br && m.CursorC == bc)
+			isSelected := (m.ChessSelected && m.ChessSelRow == br && m.ChessSelCol == bc)
+			isValidMove := m.ChessValidMoves[game.Pos{Row: br, Col: bc}]
+			isCapture := isValidMove && !m.Game.ChessBoard[br][bc].IsEmpty()
 
 			if isSelected && m.ChessIsBlocked {
 				bg = styles.ChessBlocked
@@ -583,14 +596,23 @@ const (
 	nfPawn   = "\U000F0859" // nf-md-chess_pawn
 )
 
-// Unicode fallback chess symbols (filled set)
+// Unicode fallback chess symbols (distinct sets)
 const (
-	ucKing   = "♚"
-	ucQueen  = "♛"
-	ucRook   = "♜"
-	ucBishop = "♝"
-	ucKnight = "♞"
-	ucPawn   = "♟"
+	// White
+	ucWhiteKing   = "♔"
+	ucWhiteQueen  = "♕"
+	ucWhiteRook   = "♖"
+	ucWhiteBishop = "♗"
+	ucWhiteKnight = "♘"
+	ucWhitePawn   = "♙"
+
+	// Black
+	ucBlackKing   = "♚"
+	ucBlackQueen  = "♛"
+	ucBlackRook   = "♜"
+	ucBlackBishop = "♝"
+	ucBlackKnight = "♞"
+	ucBlackPawn   = "♟"
 )
 
 func chessPieceSymbol(p game.ChessPiece, useNerd bool) string {
@@ -616,19 +638,36 @@ func chessPieceSymbol(p game.ChessPiece, useNerd bool) string {
 	}
 
 	// Unicode fallback
-	switch p.Type {
-	case "K":
-		return ucKing
-	case "Q":
-		return ucQueen
-	case "R":
-		return ucRook
-	case "B":
-		return ucBishop
-	case "N":
-		return ucKnight
-	case "P":
-		return ucPawn
+	if p.IsWhite {
+		switch p.Type {
+		case "K":
+			return ucWhiteKing
+		case "Q":
+			return ucWhiteQueen
+		case "R":
+			return ucWhiteRook
+		case "B":
+			return ucWhiteBishop
+		case "N":
+			return ucWhiteKnight
+		case "P":
+			return ucWhitePawn
+		}
+	} else {
+		switch p.Type {
+		case "K":
+			return ucBlackKing
+		case "Q":
+			return ucBlackQueen
+		case "R":
+			return ucBlackRook
+		case "B":
+			return ucBlackBishop
+		case "N":
+			return ucBlackKnight
+		case "P":
+			return ucBlackPawn
+		}
 	}
 	return ""
 }

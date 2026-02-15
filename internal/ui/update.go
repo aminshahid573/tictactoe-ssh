@@ -467,26 +467,51 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 	}
 
 	if !isMyTurn {
-		// Just navigation is allowed? Or restrict selection too?
-		// We can allow looking around.
+		// Just navigation is allowed
 	}
+
+	isFlipped := (m.MySide == "O")
 
 	switch msg.String() {
 	case "up", "k":
-		if m.CursorR > 0 {
-			m.CursorR--
+		if isFlipped {
+			if m.CursorR < 7 {
+				m.CursorR++
+			}
+		} else {
+			if m.CursorR > 0 {
+				m.CursorR--
+			}
 		}
 	case "down", "j":
-		if m.CursorR < 7 {
-			m.CursorR++
+		if isFlipped {
+			if m.CursorR > 0 {
+				m.CursorR--
+			}
+		} else {
+			if m.CursorR < 7 {
+				m.CursorR++
+			}
 		}
 	case "left", "h":
-		if m.CursorC > 0 {
-			m.CursorC--
+		if isFlipped {
+			if m.CursorC < 7 {
+				m.CursorC++
+			}
+		} else {
+			if m.CursorC > 0 {
+				m.CursorC--
+			}
 		}
 	case "right", "l":
-		if m.CursorC < 7 {
-			m.CursorC++
+		if isFlipped {
+			if m.CursorC > 0 {
+				m.CursorC--
+			}
+		} else {
+			if m.CursorC < 7 {
+				m.CursorC++
+			}
 		}
 	case "f":
 		m.UseNerdFont = !m.UseNerdFont
