@@ -8,6 +8,7 @@ import (
 
 	"tictactoe-ssh/internal/db"
 	"tictactoe-ssh/internal/game"
+	"tictactoe-ssh/internal/snake"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -119,10 +120,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.Width = msg.Width
 		m.Height = msg.Height
+		m.Snake.TermW = msg.Width
+		m.Snake.TermH = msg.Height
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
+	}
+
+	// Handle snake game ticks and input
+	if m.State == StateSnakeGame {
+		switch msg := msg.(type) {
+		case snake.TickMsg:
+			m.Snake, cmd = m.Snake.Update(msg)
+			if m.Snake.WantsQuit {
+				m.Snake.WantsQuit = false
+				m.State = StateGameSelect
+				m.MenuIndex = 0
+				return m, nil
+			}
+			return m, cmd
+		case tea.KeyMsg:
+			m.Snake, cmd = m.Snake.Update(msg)
+			if m.Snake.WantsQuit {
+				m.Snake.WantsQuit = false
+				m.State = StateGameSelect
+				m.MenuIndex = 0
+				return m, nil
+			}
+			return m, cmd
+		}
+		return m, nil
 	}
 
 	// Global Popup Handler
@@ -221,6 +249,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, cmd = updatePublicList(m, msg)
 	case StateLobby, StateGame:
 		m, cmd = updateGame(m, msg)
+	case StateSnakeGame:
+		// Handled above before popup handler
 	}
 
 	return m, cmd
@@ -255,17 +285,27 @@ func updateGameSelect(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.MenuIndex--
 			}
 		case "down", "j":
-			if m.MenuIndex < 1 { // 0: TicTacToe, 1: Chess
+			if m.MenuIndex < 2 { // 0: TicTacToe, 1: Chess, 2: Snake
 				m.MenuIndex++
 			}
 		case "enter":
-			if m.MenuIndex == 0 {
+			switch m.MenuIndex {
+			case 0:
 				m.SelectedGame = "tictactoe"
-			} else {
+				m.State = StateMenu
+				m.MenuIndex = 0
+			case 1:
 				m.SelectedGame = "chess"
+				m.State = StateMenu
+				m.MenuIndex = 0
+			case 2:
+				// Snake is single-player — go directly to snake game
+				m.Snake = snake.InitialModel()
+				m.Snake.TermW = m.Width
+				m.Snake.TermH = m.Height
+				m.State = StateSnakeGame
+				return m, snake.TickCmd()
 			}
-			m.State = StateMenu
-			m.MenuIndex = 0
 			return m, nil
 		}
 	}

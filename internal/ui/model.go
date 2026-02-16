@@ -5,6 +5,7 @@ import (
 	"sync"
 	"tictactoe-ssh/internal/db"
 	"tictactoe-ssh/internal/game"
+	"tictactoe-ssh/internal/snake"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -23,6 +24,7 @@ const (
 	StateLobby
 	StateGame
 	StateGameSelect
+	StateSnakeGame
 )
 
 const (
@@ -72,6 +74,9 @@ type Model struct {
 	ChessValidMoves map[game.Pos]bool
 	ChessIsBlocked  bool
 	UseNerdFont     bool
+
+	// Snake State
+	Snake snake.Model
 
 	Game db.Room
 }

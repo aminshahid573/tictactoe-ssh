@@ -1,6 +1,6 @@
 # SSH Game Server
 
-Play real-time multiplayer Chess and Tic-Tac-Toe straight from your terminal. No installs, no accounts—just SSH and play.
+Play real-time multiplayer Chess and Tic-Tac-Toe, or challenge yourself with Snake—straight from your terminal. No installs, no accounts—just SSH and play.
 
 ## Screenshots
 
@@ -10,13 +10,20 @@ Play real-time multiplayer Chess and Tic-Tac-Toe straight from your terminal. No
   <img src="docs/screenshots/tictac.png" alt="Tic-Tac-Toe Gameplay" width="45%">
 </p>
 
+<p align="center">
+  <img src="docs/screenshots/snake-menu.png" alt="Snake Menu" width="45%">
+  &nbsp; &nbsp;
+  <img src="docs/screenshots/snake-board.png" alt="Snake Gameplay" width="45%">
+</p>
+
 ## Demo
 https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
 
 ## Features
-*   **Two Classics**: Switch between Chess and Tic-Tac-Toe.
+*   **Three Games**: Switch between Chess, Tic-Tac-Toe, and Snake.
 *   **Zero Install**: It runs over SSH. If you have a terminal, you can play.
 *   **Instant Multiplayer**: Create a room, get a 4-letter code, and share it.
+*   **Single-Player Snake**: Pick a difficulty and chase your high score—no opponent needed.
 *   **Spectator Mode**: Watch live games by joining a full room.
 *   **Slick TUI**: A responsive, colorful terminal interface built with Bubble Tea.
 *   **Cross-Platform State**: Game state lives in Firebase, so you can reconnect if your wifi drops.

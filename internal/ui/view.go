@@ -131,6 +131,16 @@ func (m Model) View() string {
 		content = renderGameSelect(m)
 		helpText = "↑/↓: Navigate • Enter: Select"
 
+	case StateSnakeGame:
+		// Snake handles its own rendering; we just center it
+		m.Snake.TermW = m.Width
+		m.Snake.TermH = m.Height
+		snakeView := m.Snake.View()
+		if m.Width > 0 && m.Height > 0 {
+			return lipgloss.Place(m.Width, m.Height, lipgloss.Center, lipgloss.Center, snakeView)
+		}
+		return snakeView
+
 	case StateGame:
 		content = renderGame(m)
 		if m.Game.GameType == "chess" {
@@ -261,7 +271,7 @@ func max(a, b int) int {
 }
 
 func renderGameSelect(m Model) string {
-	opts := []string{"Tic Tac Toe", "Chess"}
+	opts := []string{"Tic Tac Toe", "Chess", "Snake"}
 	var renderedOpts []string
 	for i, opt := range opts {
 		if i == m.MenuIndex {
