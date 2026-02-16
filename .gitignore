@@ -25,5 +25,6 @@ Thumbs.db
 # Go
 go.work
 /vendor/
+AGENTS.md
 .ssh
 CONTEXT.md

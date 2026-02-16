@@ -1,6 +1,28 @@
-# SSH Game Server
+# TermPlay
 
-Play real-time multiplayer Chess and Tic-Tac-Toe, or challenge yourself with Snake—straight from your terminal. No installs, no accounts—just SSH and play.
+Play real-time multiplayer Chess and Tic-Tac-Toe, or challenge yourself with Snake straight from your terminal. No installs, no accounts needed. Just SSH and play.
+
+## Features
+
+*   **Three Games**: Switch between Chess, Tic-Tac-Toe, and Snake.
+*   **Zero Install**: It runs over SSH. If you have a terminal, you can play.
+*   **Instant Multiplayer**: Create a room, get a 4-letter code, and share it.
+*   **Single-Player Snake**: Pick a difficulty and chase your high score.
+*   **Spectator Mode**: Watch live games by joining a full room.
+*   **Slick TUI**: A responsive, colorful terminal interface built with Bubble Tea.
+*   **Cross-Platform State**: Game state lives in Firebase, so you can reconnect if your wifi drops.
+
+## Demo
+
+https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
+
+## Play Now
+
+The public server is coming soon! Once live, you'll be able to jump in with:
+
+```bash
+ssh termplay.me
+```
 
 ## Screenshots
 
@@ -15,26 +37,6 @@ Play real-time multiplayer Chess and Tic-Tac-Toe, or challenge yourself with Sna
   &nbsp; &nbsp;
   <img src="docs/screenshots/snake-board.png" alt="Snake Gameplay" width="45%">
 </p>
-
-## Demo
-https://github.com/user-attachments/assets/0bfcccc5-ecb1-45cc-b4f4-55dc0bf07b33
-
-## Features
-*   **Three Games**: Switch between Chess, Tic-Tac-Toe, and Snake.
-*   **Zero Install**: It runs over SSH. If you have a terminal, you can play.
-*   **Instant Multiplayer**: Create a room, get a 4-letter code, and share it.
-*   **Single-Player Snake**: Pick a difficulty and chase your high score—no opponent needed.
-*   **Spectator Mode**: Watch live games by joining a full room.
-*   **Slick TUI**: A responsive, colorful terminal interface built with Bubble Tea.
-*   **Cross-Platform State**: Game state lives in Firebase, so you can reconnect if your wifi drops.
-
-## Play Now
-
-The public server is coming soon! Once live, you'll be able to jump in with:
-
-```bash
-ssh tictactoe.example.com
-```
 
 ## Run It Yourself
 
@@ -70,7 +72,7 @@ docker run -d -p 2324:2324 \
   -e FIREBASE_DB_URL="https://YOUR-DB-URL.firebaseio.com" \
   -e GOOGLE_APPLICATION_CREDENTIALS="/app/serviceAccount.json" \
   -v "$(pwd)/serviceAccount.json:/app/serviceAccount.json" \
-  github.com/aminshahid573/termplay
+  ghcr.io/aminshahid573/termplay:latest
 ```
 
 ---
