@@ -1,11 +1,12 @@
 package ui
 
 import (
-	"strings"
-	"sync"
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/db"
 	"github.com/aminshahid573/termplay/internal/snake"
+	"github.com/aminshahid573/termplay/internal/tetris"
+	"strings"
+	"sync"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -25,6 +26,7 @@ const (
 	StateGame
 	StateGameSelect
 	StateSnakeGame
+	StateTetrisGame
 )
 
 const (
@@ -77,6 +79,9 @@ type Model struct {
 
 	// Snake State
 	Snake snake.Model
+
+	// Tetris State
+	Tetris tetris.Model
 
 	Game db.Room
 }

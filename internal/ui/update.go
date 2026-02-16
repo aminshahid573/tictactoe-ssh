@@ -9,6 +9,7 @@ import (
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/db"
 	"github.com/aminshahid573/termplay/internal/snake"
+	"github.com/aminshahid573/termplay/internal/tetris"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -122,6 +123,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 		m.Snake.TermW = msg.Width
 		m.Snake.TermH = msg.Height
+		m.Tetris.TermW = msg.Width
+		m.Tetris.TermH = msg.Height
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -144,6 +147,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.Snake, cmd = m.Snake.Update(msg)
 			if m.Snake.WantsQuit {
 				m.Snake.WantsQuit = false
+				m.State = StateGameSelect
+				m.MenuIndex = 0
+				return m, nil
+			}
+			return m, cmd
+		}
+		return m, nil
+	}
+
+	// Handle tetris game ticks and input
+	if m.State == StateTetrisGame {
+		switch msg := msg.(type) {
+		case tetris.TickMsg:
+			m.Tetris, cmd = m.Tetris.Update(msg)
+			if m.Tetris.WantsQuit {
+				m.Tetris.WantsQuit = false
+				m.State = StateGameSelect
+				m.MenuIndex = 0
+				return m, nil
+			}
+			return m, cmd
+		case tea.KeyMsg:
+			m.Tetris, cmd = m.Tetris.Update(msg)
+			if m.Tetris.WantsQuit {
+				m.Tetris.WantsQuit = false
 				m.State = StateGameSelect
 				m.MenuIndex = 0
 				return m, nil
@@ -251,6 +279,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, cmd = updateGame(m, msg)
 	case StateSnakeGame:
 		// Handled above before popup handler
+	case StateTetrisGame:
+		// Handled above
 	}
 
 	return m, cmd
@@ -285,7 +315,7 @@ func updateGameSelect(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.MenuIndex--
 			}
 		case "down", "j":
-			if m.MenuIndex < 2 { // 0: TicTacToe, 1: Chess, 2: Snake
+			if m.MenuIndex < 3 { // 0: TicTacToe, 1: Chess, 2: Snake, 3: Tetris
 				m.MenuIndex++
 			}
 		case "enter":
@@ -305,6 +335,13 @@ func updateGameSelect(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.Snake.TermH = m.Height
 				m.State = StateSnakeGame
 				return m, snake.TickCmd()
+			case 3:
+				// Tetris is single-player
+				m.Tetris = tetris.InitialModel()
+				m.Tetris.TermW = m.Width
+				m.Tetris.TermH = m.Height
+				m.State = StateTetrisGame
+				return m, m.Tetris.Init()
 			}
 			return m, nil
 		}

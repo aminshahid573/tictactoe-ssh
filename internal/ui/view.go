@@ -2,10 +2,10 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/db"
 	"github.com/aminshahid573/termplay/internal/styles"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
@@ -141,6 +141,12 @@ func (m Model) View() string {
 		}
 		return snakeView
 
+	case StateTetrisGame:
+		// Tetris handles its own rendering and centering
+		m.Tetris.TermW = m.Width
+		m.Tetris.TermH = m.Height
+		return m.Tetris.View()
+
 	case StateGame:
 		content = renderGame(m)
 		if m.Game.GameType == "chess" {
@@ -271,7 +277,7 @@ func max(a, b int) int {
 }
 
 func renderGameSelect(m Model) string {
-	opts := []string{"Tic Tac Toe", "Chess", "Snake"}
+	opts := []string{"Tic Tac Toe", "Chess", "Snake", "Tetris"}
 	var renderedOpts []string
 	for i, opt := range opts {
 		if i == m.MenuIndex {
