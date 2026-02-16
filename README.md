@@ -32,7 +32,7 @@ ssh termplay.me
 <p align="center">
   <img src="docs/screenshots/games.png" alt="Games" width="45%">
   &nbsp; &nbsp;
-  <img src="docs/screenshots/chess.png" alt="Chess Gameplay" width="45%">
+  <img src="docs/screenshots/chess-gameplay.png" alt="Chess Gameplay" width="45%">
 </p>
 
 <p align="center">
