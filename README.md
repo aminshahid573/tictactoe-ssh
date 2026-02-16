@@ -1,4 +1,7 @@
+<img width="1280" height="500" alt="20260216_141920" src="https://github.com/user-attachments/assets/18357a35-3cac-465b-8508-b4d52d85be8d" />
+
 # TermPlay
+
 
 Play real-time multiplayer Chess and Tic-Tac-Toe, or challenge yourself with Snake straight from your terminal. No installs, no accounts needed. Just SSH and play.
 
