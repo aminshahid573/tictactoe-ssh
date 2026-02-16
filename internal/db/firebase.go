@@ -6,8 +6,9 @@ import (
 	"log"
 	"os"
 	"sort"
-	"tictactoe-ssh/internal/config"
-	"tictactoe-ssh/internal/game"
+	"github.com/aminshahid573/termplay/internal/chess"
+	"github.com/aminshahid573/termplay/internal/config"
+	"github.com/aminshahid573/termplay/internal/tictactoe"
 
 	"time"
 
@@ -18,44 +19,44 @@ import (
 
 // Room is the clean, strict structure used by the Game UI
 type Room struct {
-	Code        string                `json:"code"`
-	Board       [9]string             `json:"board"`
-	Turn        string                `json:"turn"`
-	PlayerX     string                `json:"playerX"`
-	PlayerO     string                `json:"playerO"`
-	PlayerXName string                `json:"playerXName"`
-	PlayerOName string                `json:"playerOName"`
-	IsPublic    bool                  `json:"isPublic"`
-	Winner      string                `json:"winner"`
-	WinningLine []int                 `json:"winningLine"`
-	Status      string                `json:"status"`
-	WinsX       int                   `json:"winsX"`
-	WinsO       int                   `json:"winsO"`
-	Spectators  map[string]string     `json:"spectators"`
-	UpdatedAt   int64                 `json:"updatedAt"`
-	GameType    string                `json:"gameType"`
-	ChessBoard  [8][8]game.ChessPiece `json:"chessBoard"`
+	Code        string            `json:"code"`
+	Board       [9]string         `json:"board"`
+	Turn        string            `json:"turn"`
+	PlayerX     string            `json:"playerX"`
+	PlayerO     string            `json:"playerO"`
+	PlayerXName string            `json:"playerXName"`
+	PlayerOName string            `json:"playerOName"`
+	IsPublic    bool              `json:"isPublic"`
+	Winner      string            `json:"winner"`
+	WinningLine []int             `json:"winningLine"`
+	Status      string            `json:"status"`
+	WinsX       int               `json:"winsX"`
+	WinsO       int               `json:"winsO"`
+	Spectators  map[string]string `json:"spectators"`
+	UpdatedAt   int64             `json:"updatedAt"`
+	GameType    string            `json:"gameType"`
+	ChessBoard  [8][8]chess.Piece `json:"chessBoard"`
 }
 
 // rawRoom is a helper struct to safely read dirty data (mixed types) from Firebase
 type rawRoom struct {
-	Code        string                `json:"code"`
-	Board       []interface{}         `json:"board"` // Loose type to prevent crashes
-	Turn        string                `json:"turn"`
-	PlayerX     string                `json:"playerX"`
-	PlayerO     string                `json:"playerO"`
-	PlayerXName string                `json:"playerXName"`
-	PlayerOName string                `json:"playerOName"`
-	IsPublic    bool                  `json:"isPublic"`
-	Winner      string                `json:"winner"`
-	WinningLine []int                 `json:"winningLine"`
-	Status      string                `json:"status"`
-	WinsX       int                   `json:"winsX"`
-	WinsO       int                   `json:"winsO"`
-	Spectators  map[string]string     `json:"spectators"`
-	UpdatedAt   int64                 `json:"updatedAt"`
-	GameType    string                `json:"gameType"`
-	ChessBoard  [8][8]game.ChessPiece `json:"chessBoard"`
+	Code        string            `json:"code"`
+	Board       []interface{}     `json:"board"` // Loose type to prevent crashes
+	Turn        string            `json:"turn"`
+	PlayerX     string            `json:"playerX"`
+	PlayerO     string            `json:"playerO"`
+	PlayerXName string            `json:"playerXName"`
+	PlayerOName string            `json:"playerOName"`
+	IsPublic    bool              `json:"isPublic"`
+	Winner      string            `json:"winner"`
+	WinningLine []int             `json:"winningLine"`
+	Status      string            `json:"status"`
+	WinsX       int               `json:"winsX"`
+	WinsO       int               `json:"winsO"`
+	Spectators  map[string]string `json:"spectators"`
+	UpdatedAt   int64             `json:"updatedAt"`
+	GameType    string            `json:"gameType"`
+	ChessBoard  [8][8]chess.Piece `json:"chessBoard"`
 }
 
 var client *db.Client
@@ -161,7 +162,7 @@ func CreateRoom(code, pid, name string, public bool, gameType string) error {
 	}
 
 	if gameType == "chess" {
-		r.ChessBoard = game.StartingChessBoard
+		r.ChessBoard = chess.StartingBoard
 		r.Turn = "White"
 	} else {
 		r.Board = [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}
@@ -267,7 +268,7 @@ func LeaveRoom(code, pid string, isHost bool) error {
 func UpdateMove(code, pid string, idx int, r Room) error {
 	// Game Logic
 	r.Board[idx] = r.Turn
-	winner, line := game.CheckWinner(r.Board)
+	winner, line := tictactoe.CheckWinner(r.Board)
 
 	if winner != "" {
 		r.Winner = winner
@@ -278,7 +279,7 @@ func UpdateMove(code, pid string, idx int, r Room) error {
 		} else {
 			r.WinsO++
 		}
-	} else if game.CheckDraw(r.Board) {
+	} else if tictactoe.CheckDraw(r.Board) {
 		r.Status = "finished"
 	} else {
 		if r.Turn == "X" {
@@ -292,7 +293,7 @@ func UpdateMove(code, pid string, idx int, r Room) error {
 	return client.NewRef("rooms/"+code).Set(context.Background(), r)
 }
 
-func UpdateChessState(code string, board [8][8]game.ChessPiece, turn string) error {
+func UpdateChessState(code string, board [8][8]chess.Piece, turn string) error {
 	ref := client.NewRef("rooms/" + code)
 	fn := func(tn db.TransactionNode) (interface{}, error) {
 		var r Room
@@ -317,7 +318,7 @@ func RestartGame(code string, nextTurn string) error {
 		}
 
 		if r.GameType == "chess" {
-			r.ChessBoard = game.StartingChessBoard
+			r.ChessBoard = chess.StartingBoard
 			// Map X/O to White/Black if needed, or rely on caller
 			if nextTurn == "X" {
 				nextTurn = "White"

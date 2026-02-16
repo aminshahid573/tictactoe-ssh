@@ -1,11 +1,11 @@
-package game
+package chess
 
-type ChessPiece struct {
+type Piece struct {
 	Type    string `json:"type"` // "K", "Q", "R", "B", "N", "P" or ""
 	IsWhite bool   `json:"isWhite"`
 }
 
-func (p ChessPiece) IsEmpty() bool {
+func (p Piece) IsEmpty() bool {
 	return p.Type == ""
 }
 
@@ -13,8 +13,8 @@ type Pos struct {
 	Row, Col int
 }
 
-// Starting position: rows 0-7 map to ranks 8-1
-var StartingChessBoard = [8][8]ChessPiece{
+// StartingBoard: rows 0-7 map to ranks 8-1
+var StartingBoard = [8][8]Piece{
 	{{"R", false}, {"N", false}, {"B", false}, {"Q", false}, {"K", false}, {"B", false}, {"N", false}, {"R", false}},
 	{{"P", false}, {"P", false}, {"P", false}, {"P", false}, {"P", false}, {"P", false}, {"P", false}, {"P", false}},
 	{{}, {}, {}, {}, {}, {}, {}, {}},
@@ -29,7 +29,7 @@ func inBounds(r, c int) bool {
 	return r >= 0 && r < 8 && c >= 0 && c < 8
 }
 
-func GetValidChessMoves(board [8][8]ChessPiece, r, c int) map[Pos]bool {
+func GetValidMoves(board [8][8]Piece, r, c int) map[Pos]bool {
 	moves := make(map[Pos]bool)
 	piece := board[r][c]
 	if piece.IsEmpty() {

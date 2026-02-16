@@ -70,7 +70,7 @@ docker run -d -p 2324:2324 \
   -e FIREBASE_DB_URL="https://YOUR-DB-URL.firebaseio.com" \
   -e GOOGLE_APPLICATION_CREDENTIALS="/app/serviceAccount.json" \
   -v "$(pwd)/serviceAccount.json:/app/serviceAccount.json" \
-  tictactoe-ssh
+  github.com/aminshahid573/termplay
 ```
 
 ---

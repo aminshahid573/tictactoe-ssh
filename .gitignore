@@ -1,6 +1,6 @@
 # Binaries
 server
-tictactoe-ssh
+github.com/aminshahid573/termplay
 *.exe
 *.dll
 *.so
@@ -25,6 +25,5 @@ Thumbs.db
 # Go
 go.work
 /vendor/
-AGENTS.md
 .ssh
 CONTEXT.md

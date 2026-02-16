@@ -9,9 +9,9 @@ import (
 	"syscall"
 	"time"
 
-	"tictactoe-ssh/internal/config"
-	"tictactoe-ssh/internal/db"
-	"tictactoe-ssh/internal/ui"
+	"github.com/aminshahid573/termplay/internal/config"
+	"github.com/aminshahid573/termplay/internal/db"
+	"github.com/aminshahid573/termplay/internal/ui"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"

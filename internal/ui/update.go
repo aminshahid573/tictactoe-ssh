@@ -6,9 +6,9 @@ import (
 	"strings"
 	"time"
 
-	"tictactoe-ssh/internal/db"
-	"tictactoe-ssh/internal/game"
-	"tictactoe-ssh/internal/snake"
+	"github.com/aminshahid573/termplay/internal/chess"
+	"github.com/aminshahid573/termplay/internal/db"
+	"github.com/aminshahid573/termplay/internal/snake"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -605,7 +605,7 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 			// If clicking same piece -> deselect
 			if m.CursorR == m.ChessSelRow && m.CursorC == m.ChessSelCol {
 				m.ChessSelected = false
-				m.ChessValidMoves = make(map[game.Pos]bool)
+				m.ChessValidMoves = make(map[chess.Pos]bool)
 				return m, nil
 			}
 
@@ -615,17 +615,17 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 			// Is it persisted? No, local UI state.
 			// OK.
 
-			if m.ChessValidMoves[game.Pos{Row: m.CursorR, Col: m.CursorC}] {
+			if m.ChessValidMoves[chess.Pos{Row: m.CursorR, Col: m.CursorC}] {
 				// Execute Move
 				// Update Board locally then send to DB
 				newBoard := m.Game.ChessBoard
 				// Move piece
 				newBoard[m.CursorR][m.CursorC] = newBoard[m.ChessSelRow][m.ChessSelCol]
-				newBoard[m.ChessSelRow][m.ChessSelCol] = game.ChessPiece{} // Empty
+				newBoard[m.ChessSelRow][m.ChessSelCol] = chess.Piece{} // Empty
 
 				// Clear selection
 				m.ChessSelected = false
-				m.ChessValidMoves = make(map[game.Pos]bool)
+				m.ChessValidMoves = make(map[chess.Pos]bool)
 
 				// Switch Turn
 				nextTurn := "Black"
@@ -651,14 +651,14 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 					m.ChessSelRow = m.CursorR
 					m.ChessSelCol = m.CursorC
 					// Calc moves
-					m.ChessValidMoves = game.GetValidChessMoves(m.Game.ChessBoard, m.CursorR, m.CursorC)
+					m.ChessValidMoves = chess.GetValidMoves(m.Game.ChessBoard, m.CursorR, m.CursorC)
 					return m, nil
 				}
 			}
 
 			// Clicked empty/invalid -> deselect
 			m.ChessSelected = false
-			m.ChessValidMoves = make(map[game.Pos]bool)
+			m.ChessValidMoves = make(map[chess.Pos]bool)
 
 		} else {
 			// Selecting
@@ -671,7 +671,7 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 					m.ChessSelected = true
 					m.ChessSelRow = m.CursorR
 					m.ChessSelCol = m.CursorC
-					m.ChessValidMoves = game.GetValidChessMoves(m.Game.ChessBoard, m.CursorR, m.CursorC)
+					m.ChessValidMoves = chess.GetValidMoves(m.Game.ChessBoard, m.CursorR, m.CursorC)
 				}
 			}
 		}

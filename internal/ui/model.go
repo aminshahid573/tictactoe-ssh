@@ -3,9 +3,9 @@ package ui
 import (
 	"strings"
 	"sync"
-	"tictactoe-ssh/internal/db"
-	"tictactoe-ssh/internal/game"
-	"tictactoe-ssh/internal/snake"
+	"github.com/aminshahid573/termplay/internal/chess"
+	"github.com/aminshahid573/termplay/internal/db"
+	"github.com/aminshahid573/termplay/internal/snake"
 
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -71,7 +71,7 @@ type Model struct {
 	ChessSelected   bool
 	ChessSelRow     int
 	ChessSelCol     int
-	ChessValidMoves map[game.Pos]bool
+	ChessValidMoves map[chess.Pos]bool
 	ChessIsBlocked  bool
 	UseNerdFont     bool
 
@@ -125,7 +125,7 @@ func InitialModel(s ssh.Session, cleanup *CleanupState) Model {
 		MenuIndex:       0,
 		CursorR:         1,
 		CursorC:         1,
-		ChessValidMoves: make(map[game.Pos]bool),
+		ChessValidMoves: make(map[chess.Pos]bool),
 		Game:            db.Room{Board: [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}},
 	}
 }

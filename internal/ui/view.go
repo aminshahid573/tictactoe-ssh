@@ -3,9 +3,9 @@ package ui
 import (
 	"fmt"
 	"strings"
-	"tictactoe-ssh/internal/db"
-	"tictactoe-ssh/internal/game"
-	"tictactoe-ssh/internal/styles"
+	"github.com/aminshahid573/termplay/internal/chess"
+	"github.com/aminshahid573/termplay/internal/db"
+	"github.com/aminshahid573/termplay/internal/styles"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
@@ -305,6 +305,9 @@ func renderGame(m Model) string {
 			idx := r*3 + c
 			val := m.Game.Board[idx]
 			style := styles.Cell
+			if m.Game.GameType == "tictactoe" {
+				// No change, tictactoe is default
+			}
 
 			isWinCell := false
 			for _, wIdx := range m.Game.WinningLine {
@@ -428,7 +431,7 @@ func renderChessGame(m Model) string {
 
 			isCursor := (m.CursorR == br && m.CursorC == bc)
 			isSelected := (m.ChessSelected && m.ChessSelRow == br && m.ChessSelCol == bc)
-			isValidMove := m.ChessValidMoves[game.Pos{Row: br, Col: bc}]
+			isValidMove := m.ChessValidMoves[chess.Pos{Row: br, Col: bc}]
 			isCapture := isValidMove && !m.Game.ChessBoard[br][bc].IsEmpty()
 
 			if isSelected && m.ChessIsBlocked {
@@ -624,7 +627,7 @@ const (
 	ucBlackPawn   = "♟"
 )
 
-func chessPieceSymbol(p game.ChessPiece, useNerd bool) string {
+func chessPieceSymbol(p chess.Piece, useNerd bool) string {
 	if p.IsEmpty() {
 		return ""
 	}
