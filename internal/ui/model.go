@@ -83,6 +83,8 @@ type Model struct {
 	Callbreak callbreak.Model
 
 	Game db.Room
+
+	CBRoom db.CBRoom
 }
 
 func InitialModel(s ssh.Session, cleanup *CleanupState) Model {
@@ -133,6 +135,7 @@ func InitialModel(s ssh.Session, cleanup *CleanupState) Model {
 		UseNerdFont:     true,
 		Callbreak:       callbreak.NewModel(),
 		Game:            db.Room{Board: [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}},
+		CBRoom:          db.CBRoom{},
 	}
 }
 

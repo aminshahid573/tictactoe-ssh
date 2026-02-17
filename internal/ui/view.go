@@ -119,12 +119,38 @@ func (m Model) View() string {
 
 	case StateLobby:
 		code := styles.Base.Foreground(lipgloss.Color("#e3b7ff")).Bold(true).Render(m.RoomCode)
-		content = lipgloss.JoinVertical(lipgloss.Center,
-			styles.Title.Render("LOBBY"),
-			fmt.Sprintf("CODE: %s", code),
-			"\nWaiting for opponent...",
-			styles.Subtle.Render("Share this code with your friend"),
-		)
+
+		if m.SelectedGame == "callbreak" {
+			playerCount := len(m.CBRoom.Players)
+			totalPlayers := m.CBRoom.PlayerCount
+			if totalPlayers == 0 {
+				totalPlayers = 4
+			}
+
+			var players []string
+			for _, name := range m.CBRoom.Players {
+				players = append(players, "• "+name)
+			}
+			playerList := lipgloss.JoinVertical(lipgloss.Left, players...)
+
+			content = lipgloss.JoinVertical(lipgloss.Center,
+				styles.Title.Render("CALLBREAK LOBBY"),
+				fmt.Sprintf("CODE: %s", code),
+				"\n",
+				fmt.Sprintf("Waiting for players (%d/%d)...", playerCount, totalPlayers),
+				"\n",
+				playerList,
+				"\n",
+				styles.Subtle.Render("Share this code with your friends"),
+			)
+		} else {
+			content = lipgloss.JoinVertical(lipgloss.Center,
+				styles.Title.Render("LOBBY"),
+				fmt.Sprintf("CODE: %s", code),
+				"\nWaiting for opponent...",
+				styles.Subtle.Render("Share this code with your friend"),
+			)
+		}
 		helpText = "Esc: Leave Room"
 
 	case StateGameSelect:

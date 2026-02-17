@@ -32,6 +32,17 @@ type roomJoinedMsg struct {
 	gameType string
 }
 
+type cbRoomCreatedMsg struct {
+	code string
+}
+
+type cbRoomJoinedMsg struct {
+	code string
+	seat int
+}
+
+type cbRoomUpdateMsg db.CBRoom
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -41,14 +52,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// Auto-transition from Lobby to Game
 		if m.State == StateLobby && m.Game.PlayerO != "" {
 			if m.Game.GameType == "callbreak" {
-				m.Callbreak.IsMultiplayer = true
-				m.Callbreak.IsHost = true
-				m.Callbreak.MySeat = 0
-				m.Callbreak.PlayerNames = [4]string{m.MyName, m.Game.PlayerOName, "Bot1", "Bot2"}
-				m.Callbreak.Width = m.Width
-				m.Callbreak.Height = m.Height
-				m.Callbreak.StartGame()
-				m.State = StateCallbreak
+				// This branch should not be hit for new Callbreak implementation
+				// as we use CBRoom struct now.
 			} else {
 				m.State = StateGame
 			}
@@ -64,10 +69,76 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, pollCmd(m.RoomCode)
 	}
 
+	// Handle Callbreak Room Updates
+	if cbMsg, ok := msg.(cbRoomUpdateMsg); ok {
+		m.CBRoom = db.CBRoom(cbMsg)
+
+		// If Room deleted/closed
+		if m.CBRoom.HostID == "" {
+			m.Err = fmt.Errorf("Room closed by host")
+			m.State = StateMenu
+			m.RoomCode = ""
+			m.Busy = false
+			return m, nil
+		}
+
+		// Transition Logic
+		if m.State == StateLobby {
+			// If we have enough players
+			if len(m.CBRoom.Players) >= m.CBRoom.PlayerCount {
+				m.Callbreak.IsMultiplayer = true
+
+				// Configure AI seats
+				for i := 0; i < 4; i++ {
+					if i < m.CBRoom.PlayerCount {
+						m.Callbreak.IsAI[i] = false
+					} else {
+						m.Callbreak.IsAI[i] = true
+						m.Callbreak.PlayerNames[i] = fmt.Sprintf("Bot%d", i)
+					}
+				}
+
+				// Map players to seats using PlayerSeats from DB
+				for pid, seatIdx := range m.CBRoom.PlayerSeats {
+					if seatIdx >= 0 && seatIdx < 4 {
+						name := m.CBRoom.Players[pid]
+						m.Callbreak.PlayerNames[seatIdx] = name
+						if pid == m.SessionID {
+							m.Callbreak.MySeat = seatIdx
+							m.Callbreak.IsHost = (seatIdx == 0)
+						}
+					}
+				}
+
+				m.Callbreak.StartGame() // Reset/Init game state locally
+				m.State = StateCallbreak
+			}
+		}
+
+		if m.State == StateCallbreak {
+			// Sync State
+			cb := m.Callbreak
+			cb.ApplyState(m.CBRoom.GameState)
+			m.Callbreak = cb
+
+			// Rebuild names from DB state
+			for pid, seatIdx := range m.CBRoom.PlayerSeats {
+				if seatIdx >= 0 && seatIdx < 4 {
+					m.Callbreak.PlayerNames[seatIdx] = m.CBRoom.Players[pid]
+				}
+			}
+		}
+
+		return m, pollCBRoomCmd(m.RoomCode)
+	}
+
 	// 2. Handle Polling Errors
 	if err, ok := msg.(pollErrorMsg); ok {
 		m.Err = err
 		// Retry polling after delay
+		if m.SelectedGame == "callbreak" || m.CBRoom.Code != "" {
+			return m, pollCBRoomCmd(m.RoomCode)
+		}
 		return m, pollCmd(m.RoomCode)
 	}
 
@@ -94,6 +165,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.State = StateLobby
 		return m, pollCmd(msg.code)
 
+	case cbRoomCreatedMsg:
+		m.Busy = false
+		m.RoomCode = msg.code
+		m.MySide = "Host" // Callbreak Host
+		m.SelectedGame = "callbreak"
+
+		m.Cleanup.Mu.Lock()
+		m.Cleanup.RoomCode = msg.code
+		m.Cleanup.IsHost = true
+		m.Cleanup.Mu.Unlock()
+
+		m.Callbreak = callbreak.NewModel()
+		m.Callbreak.IsMultiplayer = true
+		m.Callbreak.IsHost = true
+		m.Callbreak.MySeat = 0
+		m.Callbreak.Width = m.Width
+		m.Callbreak.Height = m.Height
+
+		m.State = StateLobby
+		return m, pollCBRoomCmd(msg.code)
+
 	case roomJoinedMsg:
 		m.Busy = false
 		m.RoomCode = msg.code
@@ -114,15 +206,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.CursorR = 7
 				m.CursorC = 4
 			}
-		} else if msg.gameType == "callbreak" {
-			m.Callbreak = callbreak.NewModel()
-			m.Callbreak.IsMultiplayer = true
-			m.Callbreak.IsHost = false
-			m.Callbreak.MySeat = 1
-			m.Callbreak.Width = m.Width
-			m.Callbreak.Height = m.Height
-			m.State = StateCallbreak
-			return m, pollCmd(msg.code)
 		} else {
 			m.CursorR = 1
 			m.CursorC = 1
@@ -130,6 +213,27 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		m.State = StateGame
 		return m, pollCmd(msg.code)
+
+	case cbRoomJoinedMsg:
+		m.Busy = false
+		m.RoomCode = msg.code
+		m.SelectedGame = "callbreak"
+		// m.MySide? Callbreak doesn't use X/O.
+
+		m.Cleanup.Mu.Lock()
+		m.Cleanup.RoomCode = msg.code
+		m.Cleanup.IsHost = false
+		m.Cleanup.Mu.Unlock()
+
+		m.Callbreak = callbreak.NewModel()
+		m.Callbreak.IsMultiplayer = true
+		m.Callbreak.IsHost = false
+		m.Callbreak.MySeat = msg.seat
+		m.Callbreak.Width = m.Width
+		m.Callbreak.Height = m.Height
+
+		m.State = StateLobby // Wait in lobby until full
+		return m, pollCBRoomCmd(msg.code)
 
 	case errMsg:
 		m.Busy = false
@@ -144,6 +248,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.Height = msg.Height
 		m.Snake.TermW = msg.Width
 		m.Snake.TermH = msg.Height
+		m.Callbreak.Width = msg.Width
+		m.Callbreak.Height = msg.Height
 	case tea.KeyMsg:
 		if msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -180,17 +286,39 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case callbreak.AIMoveMsg, callbreak.TrickResultMsg, callbreak.NextTrickMsg, callbreak.RoundEndMsg, callbreak.NextRoundMsg, tea.KeyMsg:
 			if k, ok := msg.(tea.KeyMsg); ok && k.String() == "q" {
+				// Quit Logic?
 				m.State = StateGameSelect
 				m.MenuIndex = 0
 				return m, nil
 			}
+
+			// Update Callbreak Model
 			m.Callbreak, cmd = m.Callbreak.Update(msg)
 
-			// If multiplayer was selected and player count confirmed,
-			// transition to room creation flow
+			// If Host, Push State to Firebase
+			if m.Callbreak.IsHost && m.RoomCode != "" {
+				// We should probably debounce this or only do it on state changes
+				// For now, simple approach:
+				db.UpdateCBGameState(m.RoomCode, m.Callbreak.ToState())
+			}
+
+			// If multiplayer was selected and player count confirmed (Local AI game setup)
 			if m.Callbreak.IsMultiplayer && m.Callbreak.Phase == callbreak.PhasePlayerSelect {
+				// This block is legacy from local multiplayer setup?
+				// No, local "IsMultiplayer" flag usage in callbreak package might be confusing.
+				// In new flow, we set IsMultiplayer=true for online too.
+				// But PhasePlayerSelect is for choosing 2/3/4 players locally.
+				// For Online, we skip this or use it to config room?
+				// In `updateGameSelect`, we set `m.State = StateCallbreak`.
+				// The Callbreak model starts at `PhasePlayerSelect` by default.
+				// If we want to create an ONLINE room, we intercept before this?
+				// Actually, `updateGameSelect` sets `m.State = StateCallbreak`.
+				// The user sees the Callbreak Menu (Play vs AI, Multiplayer).
+				// If they select Multiplayer there, `m.Callbreak` sets `IsMultiplayer=true`.
+				// We need to catch that transition to redirect to `StateCreateConfig`.
+
 				m.SelectedGame = "callbreak"
-				m.State = StateMenu
+				m.State = StateMenu // Go to Main Menu (Create/Join)
 				m.MenuIndex = 0
 				return m, nil
 			}
@@ -205,9 +333,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg := msg.(type) {
 		case tea.KeyMsg:
 			if m.PopupType == PopupRestart {
+				// ... Restart logic (omit for brevity if not changing) ...
+				// We need to include restart logic or it will be lost
 				switch msg.String() {
 				case "1":
-					// Random
 					next := "X"
 					if m.Game.GameType == "chess" {
 						next = "White"
@@ -225,10 +354,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						return nil
 					}
 				case "2":
-					// Winner
 					next := m.Game.Winner
 					if next == "" {
-						// If draw, Random
 						if m.Game.GameType == "chess" {
 							next = "White"
 							if rand.Intn(2) == 0 {
@@ -239,15 +366,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							if rand.Intn(2) == 0 {
 								next = "O"
 							}
-						}
-					} else {
-						// Map winner to turn
-						if m.Game.GameType == "chess" {
-							// Winner is White/Black
-							next = m.Game.Winner
-						} else {
-							// Winner is X/O
-							next = m.Game.Winner
 						}
 					}
 					m.PopupActive = false
@@ -262,15 +380,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// Leave Popup
 				switch msg.String() {
 				case "y", "enter":
-					// Confirm Leave
 					isHost := (m.MySide == "X")
 					if m.RoomCode != "" {
-						db.LeaveRoom(m.RoomCode, m.SessionID, isHost)
+						if m.SelectedGame == "callbreak" {
+							db.LeaveCBRoom(m.RoomCode, m.SessionID)
+						} else {
+							db.LeaveRoom(m.RoomCode, m.SessionID, isHost)
+						}
 					}
 					m.PopupActive = false
 					m.State = StateMenu
 					m.Err = nil
-					m.RoomCode = "" // Clear room code on exit
+					m.RoomCode = ""
 					return m, nil
 				case "n", "esc":
 					m.PopupActive = false
@@ -296,8 +417,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, cmd = updatePublicList(m, msg)
 	case StateLobby, StateGame:
 		m, cmd = updateGame(m, msg)
-	case StateSnakeGame, StateCallbreak:
-		// Handled above before popup handler
 	}
 
 	return m, cmd
@@ -419,7 +538,12 @@ func updateCreateConfig(m Model, msg tea.Msg) (Model, tea.Cmd) {
 			gameType := m.SelectedGame
 			if gameType == "" {
 				gameType = "tictactoe"
-			} // Fallback
+			}
+
+			if gameType == "callbreak" {
+				return m, createCBRoomCmd(code, m.SessionID, m.MyName, m.Callbreak.HumanPlayers)
+			}
+
 			return m, createRoomCmd(code, m.SessionID, m.MyName, m.IsPublicCreate, gameType)
 		case "esc":
 			m.State = StateMenu
@@ -450,7 +574,7 @@ func updateCodeInput(m Model, msg tea.Msg) (Model, tea.Cmd) {
 	return m, cmd
 }
 
-// --- Public List Logic (Fixed Error Handling) ---
+// --- Public List Logic ---
 func updatePublicList(m Model, msg tea.Msg) (Model, tea.Cmd) {
 	var cmd tea.Cmd
 
@@ -773,24 +897,32 @@ func createRoomCmd(code, pid, name string, public bool, gameType string) tea.Cmd
 
 func joinRoomCmd(code, pid, name string) tea.Cmd {
 	return func() tea.Msg {
-		if err := db.JoinRoom(code, pid, name); err != nil {
-			return errMsg(err)
-		}
-		// Determine role async
-		r, _ := db.GetRoom(code)
-		side := "O"
-		gameType := "tictactoe"
-		if r != nil {
-			gameType = r.GameType
-			if r.PlayerX == pid {
-				side = "X"
-			} else if r.PlayerO == pid {
-				side = "O"
-			} else {
-				side = "Spectator"
+		// Try Regular Room First
+		if err := db.JoinRoom(code, pid, name); err == nil {
+			// Success
+			r, _ := db.GetRoom(code)
+			side := "O"
+			gameType := "tictactoe"
+			if r != nil {
+				gameType = r.GameType
+				if r.PlayerX == pid {
+					side = "X"
+				} else if r.PlayerO == pid {
+					side = "O"
+				} else {
+					side = "Spectator"
+				}
 			}
+			return roomJoinedMsg{code: code, side: side, gameType: gameType}
 		}
-		return roomJoinedMsg{code: code, side: side, gameType: gameType}
+
+		// If failed, try Callbreak Room
+		if seat, err := db.JoinCBRoom(code, pid, name); err == nil {
+			return cbRoomJoinedMsg{code: code, seat: seat}
+		} else {
+			// Return original error or generic
+			return errMsg(fmt.Errorf("room not found or full"))
+		}
 	}
 }
 
@@ -801,4 +933,42 @@ func generateCode() string {
 		b[i] = chars[rand.Intn(len(chars))]
 	}
 	return string(b)
+}
+
+// --- Callbreak Specific Commands ---
+
+func createCBRoomCmd(code, hostID, hostName string, playerCount int) tea.Cmd {
+	return func() tea.Msg {
+		if err := db.CreateCBRoom(code, hostID, hostName, playerCount); err != nil {
+			return errMsg(err)
+		}
+		return cbRoomCreatedMsg{code: code}
+	}
+}
+
+func joinCBRoomCmd(code, playerID, playerName string) tea.Cmd {
+	return func() tea.Msg {
+		seat, err := db.JoinCBRoom(code, playerID, playerName)
+		if err != nil {
+			return errMsg(err)
+		}
+		return cbRoomJoinedMsg{code: code, seat: seat}
+	}
+}
+
+func pollCBRoomCmd(code string) tea.Cmd {
+	return tea.Tick(time.Millisecond*500, func(t time.Time) tea.Msg {
+		r, err := db.GetCBRoom(code)
+		if err != nil {
+			if err.Error() == "room not found" {
+				// Room might have been closed
+				return cbRoomUpdateMsg{HostID: ""}
+			}
+			return pollErrorMsg(err)
+		}
+		if r == nil {
+			return cbRoomUpdateMsg{HostID: ""}
+		}
+		return cbRoomUpdateMsg(*r)
+	})
 }
