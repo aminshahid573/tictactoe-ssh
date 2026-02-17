@@ -125,6 +125,7 @@ func InitialModel(s ssh.Session, cleanup *CleanupState) Model {
 		CursorR:         1,
 		CursorC:         1,
 		ChessValidMoves: make(map[chess.Pos]bool),
+		UseNerdFont:     true,
 		Game:            db.Room{Board: [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}},
 	}
 }

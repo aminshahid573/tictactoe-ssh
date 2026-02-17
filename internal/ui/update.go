@@ -463,7 +463,17 @@ func updatePublicList(m Model, msg tea.Msg) (Model, tea.Cmd) {
 func updateGame(m Model, msg tea.Msg) (Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
-		if msg.String() == "q" || msg.String() == "esc" {
+		if msg.String() == "q" {
+			m.PopupActive = true
+			m.PopupType = PopupLeave
+			return m, nil
+		}
+		if msg.String() == "esc" {
+			if m.Game.GameType == "chess" && m.ChessSelected {
+				m.ChessSelected = false
+				m.ChessValidMoves = make(map[chess.Pos]bool)
+				return m, nil
+			}
 			m.PopupActive = true
 			m.PopupType = PopupLeave
 			return m, nil
