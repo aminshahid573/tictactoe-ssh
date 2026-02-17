@@ -2,10 +2,10 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/db"
 	"github.com/aminshahid573/termplay/internal/styles"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/muesli/reflow/truncate"
@@ -423,7 +423,7 @@ func renderChessGame(m Model) string {
 				bc = 7 - c
 			}
 
-			piece := m.Game.ChessBoard[br][bc]
+			piece := m.Game.ChessState.Board[br][bc]
 			fg := styles.ChessBlackPiece
 			if piece.IsWhite {
 				fg = styles.ChessWhitePiece
@@ -432,7 +432,7 @@ func renderChessGame(m Model) string {
 			isCursor := (m.CursorR == br && m.CursorC == bc)
 			isSelected := (m.ChessSelected && m.ChessSelRow == br && m.ChessSelCol == bc)
 			isValidMove := m.ChessValidMoves[chess.Pos{Row: br, Col: bc}]
-			isCapture := isValidMove && !m.Game.ChessBoard[br][bc].IsEmpty()
+			isCapture := isValidMove && !m.Game.ChessState.Board[br][bc].IsEmpty()
 
 			if isSelected && m.ChessIsBlocked {
 				bg = styles.ChessBlocked

@@ -3,12 +3,12 @@ package db
 import (
 	"context"
 	"fmt"
-	"log"
-	"os"
-	"sort"
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/config"
 	"github.com/aminshahid573/termplay/internal/tictactoe"
+	"log"
+	"os"
+	"sort"
 
 	"time"
 
@@ -35,7 +35,7 @@ type Room struct {
 	Spectators  map[string]string `json:"spectators"`
 	UpdatedAt   int64             `json:"updatedAt"`
 	GameType    string            `json:"gameType"`
-	ChessBoard  [8][8]chess.Piece `json:"chessBoard"`
+	ChessState  chess.GameState   `json:"chessState"`
 }
 
 // rawRoom is a helper struct to safely read dirty data (mixed types) from Firebase
@@ -56,7 +56,7 @@ type rawRoom struct {
 	Spectators  map[string]string `json:"spectators"`
 	UpdatedAt   int64             `json:"updatedAt"`
 	GameType    string            `json:"gameType"`
-	ChessBoard  [8][8]chess.Piece `json:"chessBoard"`
+	ChessState  chess.GameState   `json:"chessState"`
 }
 
 var client *db.Client
@@ -102,7 +102,7 @@ func sanitizeRoom(code string, raw rawRoom) Room {
 		WinsO:       raw.WinsO,
 		Spectators:  raw.Spectators,
 		GameType:    raw.GameType,
-		ChessBoard:  raw.ChessBoard,
+		ChessState:  raw.ChessState,
 	}
 
 	if clean.GameType == "" {
@@ -162,7 +162,7 @@ func CreateRoom(code, pid, name string, public bool, gameType string) error {
 	}
 
 	if gameType == "chess" {
-		r.ChessBoard = chess.StartingBoard
+		r.ChessState = chess.NewGame()
 		r.Turn = "White"
 	} else {
 		r.Board = [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}
@@ -293,15 +293,19 @@ func UpdateMove(code, pid string, idx int, r Room) error {
 	return client.NewRef("rooms/"+code).Set(context.Background(), r)
 }
 
-func UpdateChessState(code string, board [8][8]chess.Piece, turn string) error {
+func UpdateChessState(code string, state chess.GameState) error {
 	ref := client.NewRef("rooms/" + code)
 	fn := func(tn db.TransactionNode) (interface{}, error) {
 		var r Room
 		if err := tn.Unmarshal(&r); err != nil {
 			return nil, err
 		}
-		r.ChessBoard = board
-		r.Turn = turn
+		r.ChessState = state
+		r.Turn = state.Turn
+		if state.Status != "playing" {
+			r.Status = state.Status
+			r.Winner = state.Winner
+		}
 		r.UpdatedAt = time.Now().Unix()
 		return r, nil
 	}
@@ -318,7 +322,7 @@ func RestartGame(code string, nextTurn string) error {
 		}
 
 		if r.GameType == "chess" {
-			r.ChessBoard = chess.StartingBoard
+			r.ChessState = chess.NewGame()
 			// Map X/O to White/Black if needed, or rely on caller
 			if nextTurn == "X" {
 				nextTurn = "White"
@@ -327,7 +331,9 @@ func RestartGame(code string, nextTurn string) error {
 				nextTurn = "Black"
 			}
 			r.Turn = nextTurn
+			r.ChessState.Turn = nextTurn // Sync
 		} else {
+
 			r.Board = [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}
 			r.Turn = nextTurn
 		}

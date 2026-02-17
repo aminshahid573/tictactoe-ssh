@@ -533,8 +533,9 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 		isMyTurn = true
 	}
 
-	if !isMyTurn {
-		// Just navigation is allowed
+	// Turn enforcement only on Enter/Space
+	if (msg.String() == "enter" || msg.String() == " ") && !isMyTurn {
+		return m, nil
 	}
 
 	isFlipped := (m.MySide == "O")
@@ -585,23 +586,8 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 
 	case "enter", " ":
-		if !isMyTurn {
-			return m, nil
-		}
-
 		// Chess Move Logic
-		// Using m.Chess* fields
-		// Map CursorR/C to internal board indices?
-		// UI board is 0..7. m.Game.ChessBoard is [8][8].
-		// Indices match.
-
-		// Logic adapted from CONTEXT.md
 		if m.ChessSelected {
-			// Moving to target?
-			// Check if (m.CursorR, m.CursorC) is in ValidMoves
-			// Pos struct in game package
-			// m.ChessValidMoves is map[game.Pos]bool
-
 			// If clicking same piece -> deselect
 			if m.CursorR == m.ChessSelRow && m.CursorC == m.ChessSelCol {
 				m.ChessSelected = false
@@ -610,37 +596,22 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 			}
 
 			// If valid move
-			// But wait, m.ChessValidMoves is local state?
-			// It should be calculated when selecting.
-			// Is it persisted? No, local UI state.
-			// OK.
-
 			if m.ChessValidMoves[chess.Pos{Row: m.CursorR, Col: m.CursorC}] {
 				// Execute Move
-				// Update Board locally then send to DB
-				newBoard := m.Game.ChessBoard
-				// Move piece
-				newBoard[m.CursorR][m.CursorC] = newBoard[m.ChessSelRow][m.ChessSelCol]
-				newBoard[m.ChessSelRow][m.ChessSelCol] = chess.Piece{} // Empty
+				newState := chess.ApplyMove(m.Game.ChessState, chess.Pos{Row: m.ChessSelRow, Col: m.ChessSelCol}, chess.Pos{Row: m.CursorR, Col: m.CursorC}, "Q")
 
 				// Clear selection
 				m.ChessSelected = false
 				m.ChessValidMoves = make(map[chess.Pos]bool)
 
-				// Switch Turn
-				nextTurn := "Black"
-				if m.Game.Turn == "Black" {
-					nextTurn = "White"
-				}
-
 				return m, func() tea.Msg {
-					db.UpdateChessState(m.RoomCode, newBoard, nextTurn)
+					db.UpdateChessState(m.RoomCode, newState)
 					return nil
 				}
 			}
 
 			// If clicking another friendly piece -> select that instead
-			p := m.Game.ChessBoard[m.CursorR][m.CursorC]
+			p := m.Game.ChessState.Board[m.CursorR][m.CursorC]
 			if !p.IsEmpty() {
 				// Check color
 				isWhite := p.IsWhite
@@ -651,7 +622,7 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 					m.ChessSelRow = m.CursorR
 					m.ChessSelCol = m.CursorC
 					// Calc moves
-					m.ChessValidMoves = chess.GetValidMoves(m.Game.ChessBoard, m.CursorR, m.CursorC)
+					m.ChessValidMoves = chess.GetLegalMoves(m.Game.ChessState, m.CursorR, m.CursorC)
 					return m, nil
 				}
 			}
@@ -662,7 +633,7 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 
 		} else {
 			// Selecting
-			p := m.Game.ChessBoard[m.CursorR][m.CursorC]
+			p := m.Game.ChessState.Board[m.CursorR][m.CursorC]
 			if !p.IsEmpty() {
 				// Check color
 				isWhite := p.IsWhite
@@ -671,7 +642,7 @@ func updateChessInput(m Model, msg tea.KeyMsg) (Model, tea.Cmd) {
 					m.ChessSelected = true
 					m.ChessSelRow = m.CursorR
 					m.ChessSelCol = m.CursorC
-					m.ChessValidMoves = chess.GetValidMoves(m.Game.ChessBoard, m.CursorR, m.CursorC)
+					m.ChessValidMoves = chess.GetLegalMoves(m.Game.ChessState, m.CursorR, m.CursorC)
 				}
 			}
 		}
