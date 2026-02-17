@@ -3,14 +3,15 @@ package db
 import (
 	"context"
 	"fmt"
-	"github.com/aminshahid573/termplay/internal/chess"
-	"github.com/aminshahid573/termplay/internal/config"
-	"github.com/aminshahid573/termplay/internal/tictactoe"
 	"log"
 	"os"
 	"sort"
-
 	"time"
+
+	"github.com/aminshahid573/termplay/internal/callbreak"
+	"github.com/aminshahid573/termplay/internal/chess"
+	"github.com/aminshahid573/termplay/internal/config"
+	"github.com/aminshahid573/termplay/internal/tictactoe"
 
 	"firebase.google.com/go/v4"
 	db "firebase.google.com/go/v4/db"
@@ -19,44 +20,59 @@ import (
 
 // Room is the clean, strict structure used by the Game UI
 type Room struct {
-	Code        string            `json:"code"`
-	Board       [9]string         `json:"board"`
-	Turn        string            `json:"turn"`
-	PlayerX     string            `json:"playerX"`
-	PlayerO     string            `json:"playerO"`
-	PlayerXName string            `json:"playerXName"`
-	PlayerOName string            `json:"playerOName"`
-	IsPublic    bool              `json:"isPublic"`
-	Winner      string            `json:"winner"`
-	WinningLine []int             `json:"winningLine"`
-	Status      string            `json:"status"`
-	WinsX       int               `json:"winsX"`
-	WinsO       int               `json:"winsO"`
-	Spectators  map[string]string `json:"spectators"`
-	UpdatedAt   int64             `json:"updatedAt"`
-	GameType    string            `json:"gameType"`
-	ChessState  chess.GameState   `json:"chessState"`
+	Code        string                   `json:"code"`
+	Board       [9]string                `json:"board"`
+	Turn        string                   `json:"turn"`
+	PlayerX     string                   `json:"playerX"`
+	PlayerO     string                   `json:"playerO"`
+	PlayerXName string                   `json:"playerXName"`
+	PlayerOName string                   `json:"playerOName"`
+	IsPublic    bool                     `json:"isPublic"`
+	Winner      string                   `json:"winner"`
+	WinningLine []int                    `json:"winningLine"`
+	Status      string                   `json:"status"`
+	WinsX       int                      `json:"winsX"`
+	WinsO       int                      `json:"winsO"`
+	Spectators  map[string]string        `json:"spectators"`
+	UpdatedAt   int64                    `json:"updatedAt"`
+	GameType    string                   `json:"gameType"`
+	ChessState  chess.GameState          `json:"chessState"`
+	CBState     callbreak.CallbreakState `json:"cbState"`
+}
+
+// CBRoom is the specialized room structure for Callbreak
+type CBRoom struct {
+	Code        string                   `json:"code"`
+	HostID      string                   `json:"hostID"`
+	HostName    string                   `json:"hostName"`
+	Players     map[string]string        `json:"players"`     // ID -> Name
+	PlayerSeats map[string]int           `json:"playerSeats"` // ID -> Seat Index (0-3)
+	PlayerCount int                      `json:"playerCount"`
+	Status      string                   `json:"status"` // waiting, playing, finished
+	GameState   callbreak.CallbreakState `json:"gameState"`
+	UpdatedAt   int64                    `json:"updatedAt"`
 }
 
 // rawRoom is a helper struct to safely read dirty data (mixed types) from Firebase
 type rawRoom struct {
-	Code        string            `json:"code"`
-	Board       []interface{}     `json:"board"` // Loose type to prevent crashes
-	Turn        string            `json:"turn"`
-	PlayerX     string            `json:"playerX"`
-	PlayerO     string            `json:"playerO"`
-	PlayerXName string            `json:"playerXName"`
-	PlayerOName string            `json:"playerOName"`
-	IsPublic    bool              `json:"isPublic"`
-	Winner      string            `json:"winner"`
-	WinningLine []int             `json:"winningLine"`
-	Status      string            `json:"status"`
-	WinsX       int               `json:"winsX"`
-	WinsO       int               `json:"winsO"`
-	Spectators  map[string]string `json:"spectators"`
-	UpdatedAt   int64             `json:"updatedAt"`
-	GameType    string            `json:"gameType"`
-	ChessState  chess.GameState   `json:"chessState"`
+	Code        string                   `json:"code"`
+	Board       []interface{}            `json:"board"` // Loose type to prevent crashes
+	Turn        string                   `json:"turn"`
+	PlayerX     string                   `json:"playerX"`
+	PlayerO     string                   `json:"playerO"`
+	PlayerXName string                   `json:"playerXName"`
+	PlayerOName string                   `json:"playerOName"`
+	IsPublic    bool                     `json:"isPublic"`
+	Winner      string                   `json:"winner"`
+	WinningLine []int                    `json:"winningLine"`
+	Status      string                   `json:"status"`
+	WinsX       int                      `json:"winsX"`
+	WinsO       int                      `json:"winsO"`
+	Spectators  map[string]string        `json:"spectators"`
+	UpdatedAt   int64                    `json:"updatedAt"`
+	GameType    string                   `json:"gameType"`
+	ChessState  chess.GameState          `json:"chessState"`
+	CBState     callbreak.CallbreakState `json:"cbState"`
 }
 
 var client *db.Client
@@ -103,6 +119,7 @@ func sanitizeRoom(code string, raw rawRoom) Room {
 		Spectators:  raw.Spectators,
 		GameType:    raw.GameType,
 		ChessState:  raw.ChessState,
+		CBState:     raw.CBState,
 	}
 
 	if clean.GameType == "" {
@@ -164,6 +181,8 @@ func CreateRoom(code, pid, name string, public bool, gameType string) error {
 	if gameType == "chess" {
 		r.ChessState = chess.NewGame()
 		r.Turn = "White"
+	} else if gameType == "callbreak" {
+		r.Turn = "Host"
 	} else {
 		r.Board = [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}
 		r.Turn = "X"
@@ -312,6 +331,21 @@ func UpdateChessState(code string, state chess.GameState) error {
 	return ref.Transaction(context.Background(), fn)
 }
 
+// UpdateCBState updates the callbreak game state in Firebase via transaction.
+func UpdateCBState(code string, state callbreak.CallbreakState) error {
+	ref := client.NewRef("rooms/" + code)
+	fn := func(tn db.TransactionNode) (interface{}, error) {
+		var r Room
+		if err := tn.Unmarshal(&r); err != nil {
+			return nil, err
+		}
+		r.CBState = state
+		r.UpdatedAt = time.Now().Unix()
+		return r, nil
+	}
+	return ref.Transaction(context.Background(), fn)
+}
+
 func RestartGame(code string, nextTurn string) error {
 	ctx := context.Background()
 	ref := client.NewRef("rooms/" + code)
@@ -392,4 +426,158 @@ func CleanZombies() {
 			ref.Child(code).Delete(context.Background())
 		}
 	}
+}
+
+// --- Callbreak Specific Methods ---
+
+func CreateCBRoom(code, hostID, hostName string, playerCount int) error {
+	ref := client.NewRef("cb_rooms/" + code)
+
+	// Check if exists
+	var existing CBRoom
+	if err := ref.Get(context.Background(), &existing); err == nil && existing.HostID != "" {
+		return fmt.Errorf("room code taken")
+	}
+
+	room := CBRoom{
+		Code:        code,
+		HostID:      hostID,
+		HostName:    hostName,
+		PlayerCount: playerCount,
+		Status:      "waiting",
+		Players:     map[string]string{hostID: hostName},
+		PlayerSeats: map[string]int{hostID: 0},
+		UpdatedAt:   time.Now().Unix(),
+	}
+
+	return ref.Set(context.Background(), room)
+}
+
+func GetCBRoom(code string) (*CBRoom, error) {
+	ref := client.NewRef("cb_rooms/" + code)
+	var room CBRoom
+	if err := ref.Get(context.Background(), &room); err != nil {
+		return nil, err
+	}
+	if room.HostID == "" {
+		return nil, fmt.Errorf("room not found")
+	}
+	return &room, nil
+}
+
+// JoinCBRoom adds a player to the room and returns their seat index (0-3)
+func JoinCBRoom(code, playerID, playerName string) (int, error) {
+	ref := client.NewRef("cb_rooms/" + code)
+
+	var seat int
+	fn := func(tn db.TransactionNode) (interface{}, error) {
+		var room CBRoom
+		if err := tn.Unmarshal(&room); err != nil {
+			return nil, err
+		}
+
+		if room.HostID == "" {
+			return nil, fmt.Errorf("room not found")
+		}
+
+		if room.Players == nil {
+			room.Players = make(map[string]string)
+		}
+		if room.PlayerSeats == nil {
+			room.PlayerSeats = make(map[string]int)
+		}
+
+		// Check if already joined
+		if s, ok := room.PlayerSeats[playerID]; ok {
+			seat = s
+			room.Players[playerID] = playerName // Update name
+			room.UpdatedAt = time.Now().Unix()
+			return room, nil
+		}
+
+		if len(room.Players) >= room.PlayerCount {
+			return nil, fmt.Errorf("room is full")
+		}
+
+		// Assign next available seat
+		usedSeats := make(map[int]bool)
+		for _, s := range room.PlayerSeats {
+			usedSeats[s] = true
+		}
+
+		newSeat := -1
+		for i := 0; i < room.PlayerCount; i++ {
+			if !usedSeats[i] {
+				newSeat = i
+				break
+			}
+		}
+
+		if newSeat == -1 {
+			return nil, fmt.Errorf("no seats available")
+		}
+
+		seat = newSeat
+		room.Players[playerID] = playerName
+		room.PlayerSeats[playerID] = seat
+		room.UpdatedAt = time.Now().Unix()
+
+		return room, nil
+	}
+
+	err := ref.Transaction(context.Background(), fn)
+	return seat, err
+}
+
+func UpdateCBGameState(code string, state callbreak.CallbreakState) error {
+	ref := client.NewRef("cb_rooms/" + code)
+	fn := func(tn db.TransactionNode) (interface{}, error) {
+		var room CBRoom
+		if err := tn.Unmarshal(&room); err != nil {
+			return nil, err
+		}
+		room.GameState = state
+		room.UpdatedAt = time.Now().Unix()
+		return room, nil
+	}
+	return ref.Transaction(context.Background(), fn)
+}
+
+func CleanCBZombies() {
+	ref := client.NewRef("cb_rooms")
+	var roomMap map[string]CBRoom
+	if err := ref.Get(context.Background(), &roomMap); err != nil {
+		log.Printf("CB Janitor: Error fetching rooms: %v", err)
+		return
+	}
+
+	now := time.Now().Unix()
+	limit := int64(3600) // 1 hour
+
+	for code, r := range roomMap {
+		if now-r.UpdatedAt > limit {
+			log.Printf("CB Janitor: Deleting zombie room %s", code)
+			ref.Child(code).Delete(context.Background())
+		}
+	}
+}
+
+func LeaveCBRoom(code, playerID string) error {
+	ref := client.NewRef("cb_rooms/" + code)
+
+	return ref.Transaction(context.Background(), func(tn db.TransactionNode) (interface{}, error) {
+		var room CBRoom
+		if err := tn.Unmarshal(&room); err != nil {
+			return nil, err
+		}
+
+		if room.HostID == playerID {
+			return nil, nil // Delete room
+		}
+
+		delete(room.Players, playerID)
+		delete(room.PlayerSeats, playerID)
+		room.UpdatedAt = time.Now().Unix()
+		return room, nil
+	})
 }

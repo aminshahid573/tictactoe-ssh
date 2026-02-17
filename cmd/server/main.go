@@ -32,6 +32,7 @@ func main() {
 
 	// Cleanup old rooms on startup
 	go db.CleanZombies()
+	go db.CleanCBZombies()
 
 	// 2. Setup SSH
 	s, err := wish.NewServer(

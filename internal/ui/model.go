@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"github.com/aminshahid573/termplay/internal/callbreak"
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/db"
 	"github.com/aminshahid573/termplay/internal/snake"
@@ -25,6 +26,7 @@ const (
 	StateGame
 	StateGameSelect
 	StateSnakeGame
+	StateCallbreak
 )
 
 const (
@@ -77,7 +79,12 @@ type Model struct {
 	// Snake State
 	Snake snake.Model
 
+	// Callbreak State
+	Callbreak callbreak.Model
+
 	Game db.Room
+
+	CBRoom db.CBRoom
 }
 
 func InitialModel(s ssh.Session, cleanup *CleanupState) Model {
@@ -126,7 +133,9 @@ func InitialModel(s ssh.Session, cleanup *CleanupState) Model {
 		CursorC:         1,
 		ChessValidMoves: make(map[chess.Pos]bool),
 		UseNerdFont:     true,
+		Callbreak:       callbreak.NewModel(),
 		Game:            db.Room{Board: [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}},
+		CBRoom:          db.CBRoom{},
 	}
 }
 
