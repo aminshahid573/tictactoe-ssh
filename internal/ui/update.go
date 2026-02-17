@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aminshahid573/termplay/internal/callbreak"
 	"github.com/aminshahid573/termplay/internal/chess"
 	"github.com/aminshahid573/termplay/internal/db"
 	"github.com/aminshahid573/termplay/internal/snake"
@@ -13,13 +14,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/log"
-	"os"
 )
-
-func init() {
-	f, _ := os.OpenFile("debug.log", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
-	log.SetOutput(f)
-}
 
 // Messages
 type roomUpdateMsg db.Room
@@ -160,6 +155,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Handle Callbreak game ticks and input
+	if m.State == StateCallbreak {
+		switch msg := msg.(type) {
+		case callbreak.AIMoveMsg, callbreak.TrickResultMsg, callbreak.NextTrickMsg, callbreak.RoundEndMsg, callbreak.NextRoundMsg, tea.KeyMsg:
+			if k, ok := msg.(tea.KeyMsg); ok && k.String() == "q" {
+				m.State = StateGameSelect
+				m.MenuIndex = 0
+				return m, nil
+			}
+			m.Callbreak, cmd = m.Callbreak.Update(msg)
+
+			// If multiplayer was selected and player count confirmed,
+			// transition to room creation flow
+			if m.Callbreak.IsMultiplayer && m.Callbreak.Phase == callbreak.PhasePlayerSelect {
+				m.SelectedGame = "callbreak"
+				m.State = StateMenu
+				m.MenuIndex = 0
+				return m, nil
+			}
+
+			return m, cmd
+		}
+		return m, nil
+	}
+
 	// Global Popup Handler
 	if m.PopupActive {
 		switch msg := msg.(type) {
@@ -256,7 +276,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m, cmd = updatePublicList(m, msg)
 	case StateLobby, StateGame:
 		m, cmd = updateGame(m, msg)
-	case StateSnakeGame:
+	case StateSnakeGame, StateCallbreak:
 		// Handled above before popup handler
 	}
 
@@ -292,7 +312,7 @@ func updateGameSelect(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.MenuIndex--
 			}
 		case "down", "j":
-			if m.MenuIndex < 2 { // 0: TicTacToe, 1: Chess, 2: Snake
+			if m.MenuIndex < 3 { // 0: TicTacToe, 1: Chess, 2: Snake, 3: Callbreak
 				m.MenuIndex++
 			}
 		case "enter":
@@ -312,6 +332,13 @@ func updateGameSelect(m Model, msg tea.Msg) (Model, tea.Cmd) {
 				m.Snake.TermH = m.Height
 				m.State = StateSnakeGame
 				return m, snake.TickCmd()
+			case 3:
+				// Callbreak — show callbreak menu (AI or Multiplayer)
+				m.Callbreak = callbreak.NewModel()
+				m.Callbreak.Width = m.Width
+				m.Callbreak.Height = m.Height
+				m.State = StateCallbreak
+				return m, nil
 			}
 			return m, nil
 		}

@@ -141,6 +141,11 @@ func (m Model) View() string {
 		}
 		return snakeView
 
+	case StateCallbreak:
+		m.Callbreak.Width = m.Width
+		m.Callbreak.Height = m.Height
+		return m.Callbreak.View()
+
 	case StateGame:
 		content = renderGame(m)
 		if m.Game.GameType == "chess" {
@@ -271,7 +276,7 @@ func max(a, b int) int {
 }
 
 func renderGameSelect(m Model) string {
-	opts := []string{"Tic Tac Toe", "Chess", "Snake"}
+	opts := []string{"Tic Tac Toe", "Chess", "Snake", "Callbreak"}
 	var renderedOpts []string
 	for i, opt := range opts {
 		if i == m.MenuIndex {

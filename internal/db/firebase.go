@@ -3,14 +3,15 @@ package db
 import (
 	"context"
 	"fmt"
-	"github.com/aminshahid573/termplay/internal/chess"
-	"github.com/aminshahid573/termplay/internal/config"
-	"github.com/aminshahid573/termplay/internal/tictactoe"
 	"log"
 	"os"
 	"sort"
-
 	"time"
+
+	"github.com/aminshahid573/termplay/internal/callbreak"
+	"github.com/aminshahid573/termplay/internal/chess"
+	"github.com/aminshahid573/termplay/internal/config"
+	"github.com/aminshahid573/termplay/internal/tictactoe"
 
 	"firebase.google.com/go/v4"
 	db "firebase.google.com/go/v4/db"
@@ -19,44 +20,46 @@ import (
 
 // Room is the clean, strict structure used by the Game UI
 type Room struct {
-	Code        string            `json:"code"`
-	Board       [9]string         `json:"board"`
-	Turn        string            `json:"turn"`
-	PlayerX     string            `json:"playerX"`
-	PlayerO     string            `json:"playerO"`
-	PlayerXName string            `json:"playerXName"`
-	PlayerOName string            `json:"playerOName"`
-	IsPublic    bool              `json:"isPublic"`
-	Winner      string            `json:"winner"`
-	WinningLine []int             `json:"winningLine"`
-	Status      string            `json:"status"`
-	WinsX       int               `json:"winsX"`
-	WinsO       int               `json:"winsO"`
-	Spectators  map[string]string `json:"spectators"`
-	UpdatedAt   int64             `json:"updatedAt"`
-	GameType    string            `json:"gameType"`
-	ChessState  chess.GameState   `json:"chessState"`
+	Code        string                   `json:"code"`
+	Board       [9]string                `json:"board"`
+	Turn        string                   `json:"turn"`
+	PlayerX     string                   `json:"playerX"`
+	PlayerO     string                   `json:"playerO"`
+	PlayerXName string                   `json:"playerXName"`
+	PlayerOName string                   `json:"playerOName"`
+	IsPublic    bool                     `json:"isPublic"`
+	Winner      string                   `json:"winner"`
+	WinningLine []int                    `json:"winningLine"`
+	Status      string                   `json:"status"`
+	WinsX       int                      `json:"winsX"`
+	WinsO       int                      `json:"winsO"`
+	Spectators  map[string]string        `json:"spectators"`
+	UpdatedAt   int64                    `json:"updatedAt"`
+	GameType    string                   `json:"gameType"`
+	ChessState  chess.GameState          `json:"chessState"`
+	CBState     callbreak.CallbreakState `json:"cbState"`
 }
 
 // rawRoom is a helper struct to safely read dirty data (mixed types) from Firebase
 type rawRoom struct {
-	Code        string            `json:"code"`
-	Board       []interface{}     `json:"board"` // Loose type to prevent crashes
-	Turn        string            `json:"turn"`
-	PlayerX     string            `json:"playerX"`
-	PlayerO     string            `json:"playerO"`
-	PlayerXName string            `json:"playerXName"`
-	PlayerOName string            `json:"playerOName"`
-	IsPublic    bool              `json:"isPublic"`
-	Winner      string            `json:"winner"`
-	WinningLine []int             `json:"winningLine"`
-	Status      string            `json:"status"`
-	WinsX       int               `json:"winsX"`
-	WinsO       int               `json:"winsO"`
-	Spectators  map[string]string `json:"spectators"`
-	UpdatedAt   int64             `json:"updatedAt"`
-	GameType    string            `json:"gameType"`
-	ChessState  chess.GameState   `json:"chessState"`
+	Code        string                   `json:"code"`
+	Board       []interface{}            `json:"board"` // Loose type to prevent crashes
+	Turn        string                   `json:"turn"`
+	PlayerX     string                   `json:"playerX"`
+	PlayerO     string                   `json:"playerO"`
+	PlayerXName string                   `json:"playerXName"`
+	PlayerOName string                   `json:"playerOName"`
+	IsPublic    bool                     `json:"isPublic"`
+	Winner      string                   `json:"winner"`
+	WinningLine []int                    `json:"winningLine"`
+	Status      string                   `json:"status"`
+	WinsX       int                      `json:"winsX"`
+	WinsO       int                      `json:"winsO"`
+	Spectators  map[string]string        `json:"spectators"`
+	UpdatedAt   int64                    `json:"updatedAt"`
+	GameType    string                   `json:"gameType"`
+	ChessState  chess.GameState          `json:"chessState"`
+	CBState     callbreak.CallbreakState `json:"cbState"`
 }
 
 var client *db.Client
@@ -103,6 +106,7 @@ func sanitizeRoom(code string, raw rawRoom) Room {
 		Spectators:  raw.Spectators,
 		GameType:    raw.GameType,
 		ChessState:  raw.ChessState,
+		CBState:     raw.CBState,
 	}
 
 	if clean.GameType == "" {
@@ -164,6 +168,8 @@ func CreateRoom(code, pid, name string, public bool, gameType string) error {
 	if gameType == "chess" {
 		r.ChessState = chess.NewGame()
 		r.Turn = "White"
+	} else if gameType == "callbreak" {
+		r.Turn = "Host"
 	} else {
 		r.Board = [9]string{" ", " ", " ", " ", " ", " ", " ", " ", " "}
 		r.Turn = "X"
@@ -306,6 +312,21 @@ func UpdateChessState(code string, state chess.GameState) error {
 			r.Status = state.Status
 			r.Winner = state.Winner
 		}
+		r.UpdatedAt = time.Now().Unix()
+		return r, nil
+	}
+	return ref.Transaction(context.Background(), fn)
+}
+
+// UpdateCBState updates the callbreak game state in Firebase via transaction.
+func UpdateCBState(code string, state callbreak.CallbreakState) error {
+	ref := client.NewRef("rooms/" + code)
+	fn := func(tn db.TransactionNode) (interface{}, error) {
+		var r Room
+		if err := tn.Unmarshal(&r); err != nil {
+			return nil, err
+		}
+		r.CBState = state
 		r.UpdatedAt = time.Now().Unix()
 		return r, nil
 	}
